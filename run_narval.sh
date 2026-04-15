@@ -25,7 +25,7 @@
 set -euo pipefail
 
 module load StdEnv/2023 python/3.11 cuda/12.2
-source "$HOME/envs/repeated_prompts/bin/activate"
+source "$SCRATCH/envs/repeated_prompts/bin/activate"
 
 # HF caches on scratch (populated by prefetch_data.sh on the login node)
 export HF_HOME="$SCRATCH/.cache/huggingface"
