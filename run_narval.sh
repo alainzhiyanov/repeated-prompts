@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------
 
 #SBATCH --job-name=repeated-prompts
-#SBATCH --account=def-CHANGEME        # ← replace with your allocation
+#SBATCH --account=def-mijungp        # ← replace with your allocation
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1                  # single A100 on Narval
 #SBATCH --cpus-per-task=4
