@@ -24,7 +24,8 @@
 
 set -euo pipefail
 
-module load StdEnv/2023 python/3.11 cuda/12.2
+module purge
+module load StdEnv/2023 python/3.11 cuda/12.2 gcc arrow
 source "$SCRATCH/envs/repeated_prompts/bin/activate"
 
 # HF caches on scratch (populated by prefetch_data.sh on the login node)
