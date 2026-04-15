@@ -1,6 +1,6 @@
 """Shared constants and helpers for the repeated-prompts project."""
 
-MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_NAME = "/home/taegyoem/scratch/qwen"
 ADAPTER_DIR = "checkpoints/qwen-1.5b-double-prompt-multi/final"
 
 

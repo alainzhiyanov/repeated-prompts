@@ -27,7 +27,7 @@ pip install --no-index --upgrade pip
 pip install --no-index torch
 
 # HuggingFace ecosystem (pulled from PyPI — run on a login node with internet)
-pip install transformers datasets peft trl accelerate bitsandbytes scipy
+pip install transformers datasets peft trl accelerate scipy
 
 echo ""
 echo "Environment ready at $ENV_DIR"

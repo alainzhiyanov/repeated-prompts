@@ -6,7 +6,7 @@ Motivated by [Leviathan, Kalman, & Matias (2025)](https://arxiv.org/abs/2512.149
 
 ## Method
 
-We LoRA fine-tune [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) on a mix of three benchmarks formatted with doubled prompts. Training examples are modified from `prompt → answer` to `prompt + prompt → answer`, where the question block is concatenated with itself. All other training settings remain unchanged.
+We LoRA fine-tune [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) (loaded from a local copy at `/home/taegyoem/scratch/qwen`) on a mix of three benchmarks formatted with doubled prompts. Training examples are modified from `prompt → answer` to `prompt + prompt → answer`, where the question block is concatenated with itself. All other training settings remain unchanged.
 
 ### Training Data
 
@@ -52,7 +52,8 @@ repeated_prompts/
 ├── finetune.py         # LoRA fine-tuning with TRL SFTTrainer
 ├── eval.py             # Multi-benchmark evaluation (logit + generation)
 ├── setup_env.sh        # One-time env setup for Narval
-├── run_narval.sh       # SLURM job script
+├── prefetch_data.sh    # One-time dataset download + data prep (login node)
+├── run_narval.sh       # SLURM job script (runs offline)
 ├── requirements.txt    # Python dependencies
 └── README.md
 ```
@@ -73,15 +74,30 @@ results.json                    # Evaluation results
 
 ## Running on Compute Canada Narval
 
+Compute nodes on Narval have **no internet access**, so all model weights and
+datasets must be downloaded on a login node first. The model is expected at
+`/home/taegyoem/scratch/qwen` (a local copy of Qwen2.5-1.5B-Instruct).
+
 ### 1. Set up the environment (once, on a login node)
 
 ```bash
 bash setup_env.sh
 ```
 
-This creates a persistent virtual environment at `~/envs/repeated_prompts` with all dependencies. HuggingFace model/dataset caches are directed to `$SCRATCH` at runtime to avoid filling your home quota.
+This creates a persistent virtual environment at `~/envs/repeated_prompts` with
+all dependencies.
 
-### 2. Configure and submit
+### 2. Prefetch datasets and prepare training data (once, on a login node)
+
+```bash
+bash prefetch_data.sh
+```
+
+This downloads all HuggingFace datasets into `$SCRATCH/.cache/huggingface` and
+runs `prepare_data.py` to create the training JSONL files. Both steps require
+internet and should be run **before** submitting the SLURM job.
+
+### 3. Configure and submit
 
 Edit `run_narval.sh` and replace `def-CHANGEME` with your allocation account, then:
 
@@ -89,15 +105,15 @@ Edit `run_narval.sh` and replace `def-CHANGEME` with your allocation account, th
 sbatch run_narval.sh
 ```
 
-The job requests **1 A100 GPU, 32 GB RAM, 12 hours**. Expected runtime is ~4-6 hours:
+The job requests **1 A100 GPU, 40 GB RAM, 12 hours** and runs fully offline.
+Expected runtime is ~4-6 hours:
 
 | Step | Estimated Time |
 |------|---------------|
-| Data preparation | < 5 min |
 | Fine-tuning (3 epochs, ~13.5k examples) | ~30-60 min |
 | Evaluation (7 benchmarks × 3 conditions) | ~3-5 hours |
 
-### 3. Check results
+### 4. Check results
 
 ```bash
 cat results.json
@@ -120,7 +136,7 @@ python eval.py
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--model` | `Qwen/Qwen2.5-1.5B-Instruct` | Base model |
+| `--model` | `/home/taegyoem/scratch/qwen` | Base model (local path) |
 | `--epochs` | `3` | Training epochs |
 | `--batch_size` | `4` | Per-device batch size |
 | `--grad_accum` | `4` | Gradient accumulation steps |
@@ -134,7 +150,7 @@ python eval.py
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--model` | `Qwen/Qwen2.5-1.5B-Instruct` | Base model |
+| `--model` | `/home/taegyoem/scratch/qwen` | Base model (local path) |
 | `--adapter` | `checkpoints/.../final` | LoRA adapter path |
 | `--output` | `results.json` | Results output file |
 | `--benchmarks` | all 7 | Subset of benchmarks to evaluate |
@@ -153,6 +169,7 @@ python eval.py --benchmarks arc gsm8k name_index
 - **PEFT** (>=0.10) — LoRA training and inference
 - **TRL** (>=0.8) — `SFTTrainer` and completion-only data collator
 - **Accelerate** (>=0.28)
+- **SciPy**
 
 ## Reference
 
