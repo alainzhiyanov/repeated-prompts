@@ -5,7 +5,9 @@ ENV_DIR="$SCRATCH/envs/repeated_prompts"
 export VIRTUALENV_OVERRIDE_APP_DATA="$SCRATCH/.virtualenv"
 export PIP_CACHE_DIR="$SCRATCH/.pip-cache"
 
-module load StdEnv/2023 python/3.11 cuda/12.2
+deactivate
+module purge
+module load StdEnv/2023 python/3.11 cuda/12.2 gcc arrow
 
 mkdir -p "$SCRATCH/envs"
 mkdir -p "$VIRTUALENV_OVERRIDE_APP_DATA"
