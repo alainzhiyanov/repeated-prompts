@@ -1,19 +1,32 @@
 #!/bin/bash
-# -----------------------------------------------------------------------
-# Run this ONCE on a Narval login node (after setup_env.sh) to download
-# all HuggingFace datasets and prepare training data while internet is
-# available.  Compute nodes are offline and rely on this cache.
-#
-#   bash prefetch_data.sh
-# -----------------------------------------------------------------------
-
 set -euo pipefail
 
-module load StdEnv/2023 python/3.11 cuda/12.2
-source "$HOME/envs/repeated_prompts/bin/activate"
+module purge
+module load StdEnv/2023 python/3.11 cuda/12.2 gcc arrow
+
+source "$SCRATCH/envs/repeated_prompts/bin/activate"
+
+# ---- Force ALL caches to SCRATCH ---------------------------------------
 
 export HF_HOME="$SCRATCH/.cache/huggingface"
-mkdir -p "$HF_HOME"
+export HF_DATASETS_CACHE="$SCRATCH/.cache/huggingface/datasets"
+export TRANSFORMERS_CACHE="$SCRATCH/.cache/huggingface/transformers"
+
+export TORCH_HOME="$SCRATCH/.cache/torch"
+export XDG_CACHE_HOME="$SCRATCH/.cache"
+export PIP_CACHE_DIR="$SCRATCH/.cache/pip"
+
+# temp files (important for large dataset processing)
+export TMPDIR="$SCRATCH/tmp"
+
+mkdir -p \
+  "$HF_HOME" \
+  "$HF_DATASETS_CACHE" \
+  "$TRANSFORMERS_CACHE" \
+  "$TORCH_HOME" \
+  "$XDG_CACHE_HOME" \
+  "$PIP_CACHE_DIR" \
+  "$TMPDIR"
 
 echo "=== Prefetching HF datasets into $HF_HOME ==="
 
