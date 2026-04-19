@@ -5,14 +5,15 @@
 # Walltime: 12h is a queue-friendly first try (same as Qwen 7B). Increase only
 # if you see slurm TIMEOUT in the log.
 # Batch 2 / grad_accum 8 matches effective batch 32 like the 1.5B defaults.
+# CPU/RAM kept small; raise --mem if the job dies with host OOM.
 # -----------------------------------------------------------------------
 
 #SBATCH --job-name=rpt-mistral7
 #SBATCH --account=def-mijungp        # ← replace with your allocation
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=16G
 #SBATCH --output=logs/slurm-%j-mistral-7b.out
 #SBATCH --error=logs/slurm-%j-mistral-7b.err
 

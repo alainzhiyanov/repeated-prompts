@@ -5,15 +5,15 @@
 # Walltime: 12h is often enough for LoRA + this eval on one fast GPU; asking
 # for less time can shorten queue waits (backfill). If the job hits TIMEOUT,
 # resubmit with e.g. --time=18:00:00 or --time=24:00:00.
-# Memory: 64G host RAM helps dataloading + caching alongside a 40GB-class GPU.
+# CPU/RAM kept small (GPU does the model); raise --mem if the job dies with OOM.
 # -----------------------------------------------------------------------
 
 #SBATCH --job-name=rpt-qwen7
 #SBATCH --account=def-mijungp        # ← replace with your allocation
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=16G
 #SBATCH --output=logs/slurm-%j-qwen2.5-7b.out
 #SBATCH --error=logs/slurm-%j-qwen2.5-7b.err
 

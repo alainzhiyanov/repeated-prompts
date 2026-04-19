@@ -9,8 +9,8 @@
 #SBATCH --account=def-mijungp        # ← replace with your allocation
 #SBATCH --time=8:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=40G
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=16G
 #SBATCH --output=logs/slurm-%j-qwen2.5-1.5b.out
 #SBATCH --error=logs/slurm-%j-qwen2.5-1.5b.err
 
