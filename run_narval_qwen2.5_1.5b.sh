@@ -1,29 +1,18 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# SLURM job script for Narval (Compute Canada / Digital Research Alliance)
+# SLURM: Qwen2.5-1.5B-Instruct — LoRA fine-tune + eval (offline).
 #
-# Default run: Qwen2.5-1.5B-Instruct (same as run_narval_qwen2.5_1.5b.sh).
-# For 7B models use:
-#   sbatch run_narval_qwen2.5_7b.sh
-#   sbatch run_narval_mistral_7b.sh
-#
-# Before submitting:
-#   1. Run  bash setup_env.sh      on a login node (once).
-#   2. Run  bash prefetch_data.sh  on a login node (once, needs internet).
-#   3. Set --account below to your allocation (e.g., def-supervisor).
-#
-# Submit with:
-#   sbatch run_narval.sh
+# Walltime: 1.5B fits comfortably in 8h (train ~few h, eval dominates).
 # -----------------------------------------------------------------------
 
-#SBATCH --job-name=repeated-prompts
+#SBATCH --job-name=rpt-qwen15
 #SBATCH --account=def-mijungp        # ← replace with your allocation
 #SBATCH --time=8:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=40G
-#SBATCH --output=logs/slurm-%j.out
-#SBATCH --error=logs/slurm-%j.err
+#SBATCH --output=logs/slurm-%j-qwen2.5-1.5b.out
+#SBATCH --error=logs/slurm-%j-qwen2.5-1.5b.err
 
 set -euo pipefail
 
@@ -42,7 +31,7 @@ _job_print_elapsed() {
   mkdir -p logs 2>/dev/null || true
   printf '%s\t%s\t%s\t%ds\texit=%s\t%s\n' \
     "${SLURM_JOB_ID:-na}" \
-    "${SLURM_JOB_NAME:-run_narval}" \
+    "${SLURM_JOB_NAME:-rpt-qwen15}" \
     "$(hostname -s 2>/dev/null || hostname)" \
     "$_sec" \
     "$_ec" \
@@ -70,7 +59,7 @@ cd "$SLURM_SUBMIT_DIR"
 
 echo "=========================================="
 echo "  Job $SLURM_JOB_ID  —  $(date)"
-echo "  Model: Qwen2.5-1.5B-Instruct ($MODEL_PATH)"
+echo "  Model: Qwen2.5-1.5B-Instruct"
 echo "  Node: $SLURM_NODELIST"
 echo "  GPU:  $(nvidia-smi -L | head -1)"
 echo "=========================================="

@@ -69,5 +69,8 @@ echo "=== Preparing training data ==="
 python prepare_data.py
 
 echo ""
-echo "Prefetch complete. You can now submit the job with:"
-echo "  sbatch run_narval.sh"
+echo "Prefetch complete. Submit one job per model, for example:"
+echo "  sbatch run_narval.sh                    # Qwen2.5-1.5B (default)"
+echo "  sbatch run_narval_qwen2.5_1.5b.sh"
+echo "  sbatch run_narval_qwen2.5_7b.sh"
+echo "  sbatch run_narval_mistral_7b.sh"

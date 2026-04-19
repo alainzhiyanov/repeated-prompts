@@ -1,8 +1,10 @@
 """
-LoRA fine-tune Qwen2.5-1.5B-Instruct on double-prompted training data.
+LoRA fine-tune a causal LM on double-prompted training data (chat models).
 
 The training JSONL is produced by prepare_data.py and contains examples from
 ARC-Challenge, OpenBookQA, and GSM8K — all formatted with repeated prompts.
+Completion-only loss uses the tokenizer's chat template (works for Qwen,
+Mistral, Llama-style instruct models).
 
 Usage:
     python prepare_data.py          # run first
@@ -20,6 +22,31 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import DataCollatorForCompletionOnlyLM, SFTConfig, SFTTrainer
 
 from utils import ADAPTER_DIR, MODEL_NAME
+
+
+def assistant_response_prefix(tokenizer) -> str:
+    """Prefix added before the assistant's answer (masked out of the LM loss)."""
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "."},
+    ]
+    without = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=False
+    )
+    with_assistant = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    if not with_assistant.startswith(without):
+        raise RuntimeError(
+            "Chat template does not extend the no-generation string; "
+            "cannot infer assistant prefix for SFT masking."
+        )
+    prefix = with_assistant[len(without) :]
+    if not prefix:
+        raise RuntimeError(
+            "Tokenizer returned an empty assistant prefix with add_generation_prompt=True."
+        )
+    return prefix
 
 
 def load_jsonl(path: str) -> list[dict]:
@@ -51,6 +78,11 @@ def main() -> None:
     parser.add_argument("--max_seq_length", type=int, default=1024)
     parser.add_argument("--lora_r", type=int, default=16)
     parser.add_argument("--lora_alpha", type=int, default=32)
+    parser.add_argument(
+        "--response_template",
+        default=None,
+        help="Override for DataCollatorForCompletionOnlyLM (default: infer from tokenizer).",
+    )
     args = parser.parse_args()
 
     print(f"Loading model: {args.model}")
@@ -84,11 +116,11 @@ def main() -> None:
     val_ds = apply_chat_template(tokenizer, load_jsonl(args.val_data))
     print(f"  train: {len(train_ds)}  val: {len(val_ds)}")
 
-    response_template = "<|im_start|>assistant\n"
-    instruction_template = "<|im_start|>user\n"
+    response_template = args.response_template or assistant_response_prefix(tokenizer)
+    print(f"  SFT response_template (loss starts after this): {response_template!r}")
     collator = DataCollatorForCompletionOnlyLM(
         response_template=response_template,
-        instruction_template=instruction_template,
+        instruction_template=None,
         tokenizer=tokenizer,
     )
 

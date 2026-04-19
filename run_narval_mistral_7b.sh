@@ -1,29 +1,20 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# SLURM job script for Narval (Compute Canada / Digital Research Alliance)
+# SLURM: Mistral-7B-Instruct-v0.2 — LoRA fine-tune + eval (offline).
 #
-# Default run: Qwen2.5-1.5B-Instruct (same as run_narval_qwen2.5_1.5b.sh).
-# For 7B models use:
-#   sbatch run_narval_qwen2.5_7b.sh
-#   sbatch run_narval_mistral_7b.sh
-#
-# Before submitting:
-#   1. Run  bash setup_env.sh      on a login node (once).
-#   2. Run  bash prefetch_data.sh  on a login node (once, needs internet).
-#   3. Set --account below to your allocation (e.g., def-supervisor).
-#
-# Submit with:
-#   sbatch run_narval.sh
+# Walltime: 12h is a queue-friendly first try (same as Qwen 7B). Increase only
+# if you see slurm TIMEOUT in the log.
+# Batch 2 / grad_accum 8 matches effective batch 32 like the 1.5B defaults.
 # -----------------------------------------------------------------------
 
-#SBATCH --job-name=repeated-prompts
+#SBATCH --job-name=rpt-mistral7
 #SBATCH --account=def-mijungp        # ← replace with your allocation
-#SBATCH --time=8:00:00
+#SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=40G
-#SBATCH --output=logs/slurm-%j.out
-#SBATCH --error=logs/slurm-%j.err
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --output=logs/slurm-%j-mistral-7b.out
+#SBATCH --error=logs/slurm-%j-mistral-7b.err
 
 set -euo pipefail
 
@@ -42,7 +33,7 @@ _job_print_elapsed() {
   mkdir -p logs 2>/dev/null || true
   printf '%s\t%s\t%s\t%ds\texit=%s\t%s\n' \
     "${SLURM_JOB_ID:-na}" \
-    "${SLURM_JOB_NAME:-run_narval}" \
+    "${SLURM_JOB_NAME:-rpt-mistral7}" \
     "$(hostname -s 2>/dev/null || hostname)" \
     "$_sec" \
     "$_ec" \
@@ -51,9 +42,9 @@ _job_print_elapsed() {
 }
 trap '_job_print_elapsed $?' EXIT
 
-MODEL_PATH=/home/taegyoem/scratch/qwen2.5_1.5b_instruct
-CKPT_DIR=checkpoints/qwen2.5-1.5b-double-prompt-multi/final
-RESULTS=results_qwen2.5_1.5b.json
+MODEL_PATH=/home/taegyoem/scratch/mistral_7b_instruct
+CKPT_DIR=checkpoints/mistral-7b-double-prompt-multi/final
+RESULTS=results_mistral_7b.json
 
 module purge
 module load StdEnv/2023 python/3.11 cuda/12.2 gcc arrow
@@ -70,7 +61,7 @@ cd "$SLURM_SUBMIT_DIR"
 
 echo "=========================================="
 echo "  Job $SLURM_JOB_ID  —  $(date)"
-echo "  Model: Qwen2.5-1.5B-Instruct ($MODEL_PATH)"
+echo "  Model: Mistral-7B-Instruct-v0.2"
 echo "  Node: $SLURM_NODELIST"
 echo "  GPU:  $(nvidia-smi -L | head -1)"
 echo "=========================================="
@@ -79,7 +70,9 @@ echo ""
 echo "[1/2] Fine-tuning …"
 python finetune.py \
   --model "$MODEL_PATH" \
-  --output_dir "$CKPT_DIR"
+  --output_dir "$CKPT_DIR" \
+  --batch_size 2 \
+  --grad_accum 8
 
 echo ""
 echo "[2/2] Evaluating …"

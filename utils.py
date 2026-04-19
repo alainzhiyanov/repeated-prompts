@@ -1,7 +1,7 @@
 """Shared constants and helpers for the repeated-prompts project."""
 
-MODEL_NAME = "/home/taegyoem/scratch/qwen"
-ADAPTER_DIR = "checkpoints/qwen-1.5b-double-prompt-multi/final"
+MODEL_NAME = "/home/taegyoem/scratch/qwen2.5_1.5b_instruct"
+ADAPTER_DIR = "checkpoints/qwen2.5-1.5b-double-prompt-multi/final"
 
 
 def make_messages(
