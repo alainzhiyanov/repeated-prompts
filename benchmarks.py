@@ -7,7 +7,7 @@ Held-out eval benchmarks: MMLU-Pro, MATH, NameIndex (custom), MiddleMatch (custo
 import random
 import re
 
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +299,8 @@ BENCHMARKS = {
     },
     "math": {
         "display_name": "MATH",
-        "hf_path": ("hendrycks/competition_math",),
+        # Loaded via _load_math_split (EleutherAI mirror); hf_path unused.
+        "hf_path": ("EleutherAI/hendrycks_math",),
         "splits": {"train": "train", "test": "test"},
         "format_fn": _math_fmt,
         "answer_fn": _math_ans,
@@ -342,6 +343,27 @@ EVAL_BENCHMARKS = list(BENCHMARKS.keys())
 # Loading
 # ---------------------------------------------------------------------------
 
+# MATH: `hendrycks/competition_math` is often unavailable on the Hub; EleutherAI
+# mirrors the same splits (7500 train / 5000 test) as seven subject configs.
+_MATH_SUBJECTS = (
+    "algebra",
+    "counting_and_probability",
+    "geometry",
+    "intermediate_algebra",
+    "number_theory",
+    "prealgebra",
+    "precalculus",
+)
+
+
+def _load_math_split(hf_split: str):
+    parts = [
+        load_dataset("EleutherAI/hendrycks_math", subj, split=hf_split)
+        for subj in _MATH_SUBJECTS
+    ]
+    return concatenate_datasets(parts)
+
+
 def load_split(name: str, split: str):
     """Load a benchmark split.  Returns HF Dataset or list[dict] for custom."""
     cfg = BENCHMARKS[name]
@@ -349,5 +371,7 @@ def load_split(name: str, split: str):
         if split != "test":
             raise ValueError(f"{name} is custom-generated and only has a 'test' split")
         return cfg["custom_generator"]()
+    if name == "math":
+        return _load_math_split(cfg["splits"][split])
     hf_split = cfg["splits"][split]
     return load_dataset(*cfg["hf_path"], split=hf_split)

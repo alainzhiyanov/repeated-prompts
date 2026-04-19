@@ -38,7 +38,6 @@ datasets_to_fetch = [
     ("allenai/openbookqa", "main"),
     ("openai/gsm8k", "main"),
     ("TIGER-Lab/MMLU-Pro",),
-    ("hendrycks/competition_math",),
 ]
 
 for args in datasets_to_fetch:
@@ -46,6 +45,21 @@ for args in datasets_to_fetch:
     print(f"  Downloading {name} …")
     load_dataset(*args)
     print(f"    ✓ {name}")
+
+# MATH: use EleutherAI mirror (hendrycks/competition_math is often unavailable on the Hub).
+_math_subjects = (
+    "algebra",
+    "counting_and_probability",
+    "geometry",
+    "intermediate_algebra",
+    "number_theory",
+    "prealgebra",
+    "precalculus",
+)
+print("  Downloading EleutherAI/hendrycks_math (all subjects) …")
+for subj in _math_subjects:
+    load_dataset("EleutherAI/hendrycks_math", subj)
+print("    ✓ EleutherAI/hendrycks_math")
 
 print("\nAll datasets cached.")
 PYEOF
