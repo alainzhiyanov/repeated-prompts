@@ -24,27 +24,65 @@ from trl import DataCollatorForCompletionOnlyLM, SFTConfig, SFTTrainer
 from utils import ADAPTER_DIR, MODEL_NAME
 
 
+def load_tokenizer(model_name: str):
+    """Load tokenizer with a fast->slow fallback for offline/HPC environments."""
+    try:
+        return AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True, use_fast=True
+        )
+    except Exception as fast_err:
+        print(
+            "Fast tokenizer load failed; retrying with use_fast=False "
+            f"(reason: {fast_err})"
+        )
+        try:
+            return AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=True, use_fast=False
+            )
+        except Exception as slow_err:
+            raise RuntimeError(
+                "Tokenizer load failed for both fast and slow implementations. "
+                "Install tokenizer dependencies in your env (typically "
+                "`protobuf`, `sentencepiece`, and/or `tiktoken`) and retry."
+            ) from slow_err
+
+
 def assistant_response_prefix(tokenizer) -> str:
     """Prefix added before the assistant's answer (masked out of the LM loss)."""
-    messages = [
+    # Primary path: render a chat that includes a known assistant sentinel and
+    # split just before that sentinel. This works even when
+    # add_generation_prompt=True returns no extra text.
+    sentinel = "__ASSISTANT_SENTINEL_7e2f6b2c__"
+    with_assistant_turn = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "."},
+        {"role": "assistant", "content": sentinel},
     ]
+    rendered = tokenizer.apply_chat_template(
+        with_assistant_turn, tokenize=False, add_generation_prompt=False
+    )
+    cut = rendered.find(sentinel)
+    if cut != -1:
+        return rendered[:cut]
+
+    # Fallback path: infer from generation prompt delta.
+    messages = with_assistant_turn[:-1]
     without = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=False
     )
-    with_assistant = tokenizer.apply_chat_template(
+    with_generation_prompt = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True
     )
-    if not with_assistant.startswith(without):
+    if not with_generation_prompt.startswith(without):
         raise RuntimeError(
-            "Chat template does not extend the no-generation string; "
-            "cannot infer assistant prefix for SFT masking."
+            "Could not infer assistant response prefix from chat template. "
+            "Pass --response_template explicitly for this model/template."
         )
-    prefix = with_assistant[len(without) :]
+    prefix = with_generation_prompt[len(without) :]
     if not prefix:
         raise RuntimeError(
-            "Tokenizer returned an empty assistant prefix with add_generation_prompt=True."
+            "Tokenizer returned an empty assistant prefix. "
+            "Pass --response_template explicitly for this model/template."
         )
     return prefix
 
@@ -86,7 +124,7 @@ def main() -> None:
     args = parser.parse_args()
 
     print(f"Loading model: {args.model}")
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer = load_tokenizer(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 

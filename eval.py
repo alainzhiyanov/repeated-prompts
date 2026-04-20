@@ -26,6 +26,29 @@ from benchmarks import BENCHMARKS, EVAL_BENCHMARKS, load_split, make_double
 from utils import ADAPTER_DIR, MODEL_NAME, make_messages
 
 
+def load_tokenizer(model_name: str):
+    """Load tokenizer with a fast->slow fallback for offline/HPC environments."""
+    try:
+        return AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True, use_fast=True
+        )
+    except Exception as fast_err:
+        print(
+            "Fast tokenizer load failed; retrying with use_fast=False "
+            f"(reason: {fast_err})"
+        )
+        try:
+            return AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=True, use_fast=False
+            )
+        except Exception as slow_err:
+            raise RuntimeError(
+                "Tokenizer load failed for both fast and slow implementations. "
+                "Install tokenizer dependencies in your env (typically "
+                "`protobuf`, `sentencepiece`, and/or `tiktoken`) and retry."
+            ) from slow_err
+
+
 # ---------------------------------------------------------------------------
 # Evaluation routines
 # ---------------------------------------------------------------------------
@@ -175,7 +198,7 @@ def main() -> None:
 
     # -- Load model -----------------------------------------------------------
     print(f"\nLoading base model: {args.model}")
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer = load_tokenizer(args.model)
     base_model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype=torch.bfloat16,

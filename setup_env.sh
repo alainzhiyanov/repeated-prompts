@@ -22,7 +22,7 @@ source "$ENV_DIR/bin/activate"
 pip install --no-index torch
 
 # PyPI packages; pyarrow will resolve via the loaded Arrow module
-pip install transformers datasets peft 'trl<0.20' accelerate scipy
+pip install transformers datasets peft 'trl<0.20' accelerate scipy protobuf sentencepiece tiktoken
 
 echo ""
 echo "Environment ready at $ENV_DIR"
