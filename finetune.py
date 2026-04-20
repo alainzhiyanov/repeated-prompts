@@ -48,41 +48,64 @@ def load_tokenizer(model_name: str):
 
 
 def assistant_response_prefix(tokenizer) -> str:
-    """Prefix added before the assistant's answer (masked out of the LM loss)."""
-    # Primary path: render a chat that includes a known assistant sentinel and
-    # split just before that sentinel. This works even when
-    # add_generation_prompt=True returns no extra text.
-    sentinel = "__ASSISTANT_SENTINEL_7e2f6b2c__"
-    with_assistant_turn = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "."},
-        {"role": "assistant", "content": sentinel},
-    ]
-    rendered = tokenizer.apply_chat_template(
-        with_assistant_turn, tokenize=False, add_generation_prompt=False
-    )
-    cut = rendered.find(sentinel)
-    if cut != -1:
-        return rendered[:cut]
+    """Stable marker that appears right before the assistant turn.
 
-    # Fallback path: infer from generation prompt delta.
-    messages = with_assistant_turn[:-1]
-    without = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=False
-    )
-    with_generation_prompt = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    if not with_generation_prompt.startswith(without):
+    `DataCollatorForCompletionOnlyLM` locates this substring (by token id) in
+    each training example and masks everything up to and including it. It must
+    therefore depend on *nothing* other than the chat template itself: any
+    user/system content that leaks into the prefix will make the search fail,
+    causing every label to be masked, no gradients to flow, and the LoRA
+    adapter to stay at its zero initialization (B=0 → adapter is a no-op).
+
+    We obtain a content-independent prefix by rendering two chats that differ
+    only in user/system content and taking the longest common suffix of the
+    text preceding an assistant sentinel. Anything that varies with the input
+    drops out of the suffix; only the template-level chat scaffolding remains
+    (e.g. `<|im_start|>assistant\\n` for Qwen, `[/INST]` for Mistral,
+    `<|start_header_id|>assistant<|end_header_id|>\\n\\n` for Llama-3).
+    """
+    sentinel = "__ASSISTANT_SENTINEL_7e2f6b2c__"
+
+    def render(system: str, user: str) -> str:
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+            {"role": "assistant", "content": sentinel},
+        ]
+        try:
+            return tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False
+            )
+        except Exception:
+            return tokenizer.apply_chat_template(
+                messages[1:], tokenize=False, add_generation_prompt=False
+            )
+
+    r1 = render("You are a helpful assistant.", "AAA first question?")
+    r2 = render("A different system prompt.", "ZZZ totally other query!")
+    p1, p2 = r1[: r1.find(sentinel)], r2[: r2.find(sentinel)]
+    if r1.find(sentinel) == -1 or r2.find(sentinel) == -1:
         raise RuntimeError(
-            "Could not infer assistant response prefix from chat template. "
-            "Pass --response_template explicitly for this model/template."
+            "Chat template dropped the assistant sentinel; cannot infer "
+            "response prefix. Pass --response_template explicitly."
         )
-    prefix = with_generation_prompt[len(without) :]
+
+    i = 0
+    max_len = min(len(p1), len(p2))
+    while i < max_len and p1[-1 - i] == p2[-1 - i]:
+        i += 1
+    if i == 0:
+        raise RuntimeError(
+            "No common suffix between two renderings — the chat template "
+            "mixes user content into the assistant prefix. "
+            "Pass --response_template explicitly."
+        )
+
+    prefix = p1[-i:].lstrip()
     if not prefix:
         raise RuntimeError(
-            "Tokenizer returned an empty assistant prefix. "
-            "Pass --response_template explicitly for this model/template."
+            "Inferred assistant prefix is whitespace-only. "
+            "Pass --response_template explicitly."
         )
     return prefix
 
@@ -90,6 +113,44 @@ def assistant_response_prefix(tokenizer) -> str:
 def load_jsonl(path: str) -> list[dict]:
     with open(path) as f:
         return [json.loads(line) for line in f]
+
+
+def _sanity_check_response_template(tokenizer, dataset, response_template: str,
+                                    n_samples: int = 8) -> None:
+    """Fail loudly if the collator wouldn't find the template in training data.
+
+    Mirrors the substring search that DataCollatorForCompletionOnlyLM performs
+    on token ids (not strings), so tokenizer quirks (leading spaces, BPE merges)
+    are covered.
+    """
+    template_ids = tokenizer.encode(response_template, add_special_tokens=False)
+    if not template_ids:
+        raise RuntimeError(
+            f"Response template {response_template!r} tokenizes to zero tokens."
+        )
+
+    checked = min(n_samples, len(dataset))
+    for i in range(checked):
+        seq_ids = tokenizer(dataset[i]["text"], add_special_tokens=False)["input_ids"]
+        if not _contains_subsequence(seq_ids, template_ids):
+            raise RuntimeError(
+                "Response template not found in training example "
+                f"{i}: DataCollatorForCompletionOnlyLM would mask every "
+                "label as -100, producing zero gradients.\n"
+                f"  response_template = {response_template!r}\n"
+                f"  template token ids = {template_ids}\n"
+                "Pass --response_template explicitly if auto-inference is wrong."
+            )
+    print(f"  response_template sanity check passed on {checked} examples")
+
+
+def _contains_subsequence(seq: list[int], sub: list[int]) -> bool:
+    if not sub or len(sub) > len(seq):
+        return False
+    for i in range(len(seq) - len(sub) + 1):
+        if seq[i : i + len(sub)] == sub:
+            return True
+    return False
 
 
 def apply_chat_template(tokenizer, records: list[dict]) -> Dataset:
@@ -161,6 +222,11 @@ def main() -> None:
         instruction_template=None,
         tokenizer=tokenizer,
     )
+
+    # Guardrail: if the response template can't be found in training examples,
+    # the collator silently masks every label as -100, producing zero gradients
+    # and an unchanged LoRA adapter (B stays at 0). Surface that now.
+    _sanity_check_response_template(tokenizer, train_ds, response_template)
 
     use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
     training_args = SFTConfig(
