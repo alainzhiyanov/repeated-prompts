@@ -43,7 +43,7 @@ _job_print_elapsed() {
 }
 trap '_job_print_elapsed $?' EXIT
 
-MODEL_PATH=/home/taegyoem/scratch/qwen2.5_7b_instruct
+MODEL_PATH=/home/taegyoem/scratch/qwen_7b
 CKPT_DIR=checkpoints/qwen2.5-7b-double-prompt-multi/final
 RESULTS=results_qwen2.5_7b.json
 
