@@ -10,7 +10,7 @@
 
 #SBATCH --job-name=rpt-mistral7
 #SBATCH --account=def-mijungp        # ← replace with your allocation
-#SBATCH --time=9:00:00
+#SBATCH --time=8:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16G
