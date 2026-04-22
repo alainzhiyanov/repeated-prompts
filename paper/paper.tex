@@ -29,7 +29,7 @@
 \newcommand{\neg}[1]{\textcolor{badred}{$-#1$}}
 
 
-\title{Prompt Repetition Finetuning is All You Need. Prompt Repetition Finetuning is All You Need. }
+\title{Prompt Repetition Finetuning is All You Need. \\ Prompt Repetition Finetuning is All You Need. }
 
 \author{%
   Noah Marusenko\\
@@ -230,19 +230,11 @@ on every benchmark except Mistral-7B's GSM8K---and the gains are much
 larger than the inference-time effect. Qwen2.5-1.5B gains $+17.0$ pp on
 OpenBookQA, $+6.8$ pp on ARC, and $+7.1$ pp on GSM8K relative to its
 already-doubled baseline; Qwen2.5-7B, despite a much higher starting
-point, still gains $+5.6$, $+5.1$, and $+5.1$ pp. \Cref{fig:heat} shows
-the total gain over the vanilla single-prompt baseline as a matrix: the
-in-distribution columns are uniformly warm except for Mistral-7B's
-GSM8K, and the held-out columns are much paler.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.95\linewidth]{figures/per_model_heatmap.pdf}
-  \caption{Total gain of the fine-tuned double-prompt model over the
-  vanilla single-prompt baseline, in accuracy. The solid vertical line
-  separates in-distribution from held-out benchmarks.}
-  \label{fig:heat}
-\end{figure}
+point, still gains $+5.6$, $+5.1$, and $+5.1$ pp. The total gain over
+the vanilla single-prompt baseline (condition 3 $-$ condition 1) is
+uniformly positive on the in-distribution benchmarks except for
+Mistral-7B's GSM8K, and is much smaller on the held-out benchmarks
+(see the per-model tables in \cref{app:numbers}).
 
 \paragraph{Held-out behaviour.}
 The inference-time gain transfers roughly as well as it appears in
@@ -316,6 +308,10 @@ model can be taught to exploit, not as a universal way to improve
 attention.
 
 
+\paragraph{Code and data.}
+All training scripts, evaluation pipelines, and per-benchmark results
+are available at
+\url{https://github.com/alainzhiyanov/repeated-prompts}.
 
 
 \printbibliography
@@ -328,7 +324,7 @@ attention.
 \section{Full numerical results} \label{app:numbers}
 
 \Cref{tab:qwen15,tab:mistral,tab:qwen7} give the raw accuracies
-underlying \cref{fig:main,fig:gain,fig:heat}.
+underlying \cref{fig:main,fig:gain}.
 Columns $\Delta_{\text{DP}}$ and $\Delta_{\text{FT}}$ are the
 double-prompt and fine-tuning gains respectively; $n$ is the number of
 test examples evaluated.

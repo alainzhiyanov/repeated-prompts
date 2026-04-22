@@ -254,7 +254,6 @@ def main():
     results = load_all()
     fig_main(results)
     fig_gain_decomp(results)
-    fig_heatmap(results)
     print("Wrote figures to", FIG)
 
 
