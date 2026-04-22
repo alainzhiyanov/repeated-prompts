@@ -115,33 +115,47 @@ def load_jsonl(path: str) -> list[dict]:
         return [json.loads(line) for line in f]
 
 
-def _sanity_check_response_template(tokenizer, dataset, response_template: str,
-                                    n_samples: int = 8) -> None:
-    """Fail loudly if the collator wouldn't find the template in training data.
-
-    Mirrors the substring search that DataCollatorForCompletionOnlyLM performs
-    on token ids (not strings), so tokenizer quirks (leading spaces, BPE merges)
-    are covered.
-    """
+def _template_found_in_all(tokenizer, dataset, response_template: str,
+                            n_samples: int = 8) -> bool:
+    """Return True iff the token-id form of *response_template* appears in
+    each of the first *n_samples* training examples."""
     template_ids = tokenizer.encode(response_template, add_special_tokens=False)
     if not template_ids:
-        raise RuntimeError(
-            f"Response template {response_template!r} tokenizes to zero tokens."
-        )
-
+        return False
     checked = min(n_samples, len(dataset))
     for i in range(checked):
         seq_ids = tokenizer(dataset[i]["text"], add_special_tokens=False)["input_ids"]
         if not _contains_subsequence(seq_ids, template_ids):
-            raise RuntimeError(
-                "Response template not found in training example "
-                f"{i}: DataCollatorForCompletionOnlyLM would mask every "
-                "label as -100, producing zero gradients.\n"
-                f"  response_template = {response_template!r}\n"
-                f"  template token ids = {template_ids}\n"
-                "Pass --response_template explicitly if auto-inference is wrong."
-            )
-    print(f"  response_template sanity check passed on {checked} examples")
+            return False
+    return True
+
+
+def resolve_response_template(tokenizer, dataset, candidate: str,
+                              n_samples: int = 8) -> str:
+    """Pick the response_template variant that actually appears in training data.
+
+    DataCollatorForCompletionOnlyLM locates the template by *token-id*
+    subsequence, not by string. SentencePiece/BPE tokenizers encode the same
+    text differently in isolation vs. in context: in particular, a trailing
+    space on Mistral's `[/INST] ` tokenizes to a standalone `▁` token (id 28705)
+    that never appears in real sequences, because the space merges into the
+    next word's token. We therefore try the inferred string first, then a
+    right-stripped variant, and keep the first one that is found. This fixes
+    the zero-gradient failure mode (every label masked → adapter never moves).
+    """
+    for cand in (candidate, candidate.rstrip()):
+        if cand and _template_found_in_all(tokenizer, dataset, cand, n_samples):
+            return cand
+
+    template_ids = tokenizer.encode(candidate, add_special_tokens=False)
+    raise RuntimeError(
+        "Response template not found in training examples for any tried "
+        "variant. DataCollatorForCompletionOnlyLM would mask every label as "
+        "-100, producing zero gradients.\n"
+        f"  tried            = {[candidate, candidate.rstrip()]!r}\n"
+        f"  template token ids = {template_ids}\n"
+        "Pass --response_template explicitly if auto-inference is wrong."
+    )
 
 
 def _contains_subsequence(seq: list[int], sub: list[int]) -> bool:
@@ -215,18 +229,22 @@ def main() -> None:
     val_ds = apply_chat_template(tokenizer, load_jsonl(args.val_data))
     print(f"  train: {len(train_ds)}  val: {len(val_ds)}")
 
-    response_template = args.response_template or assistant_response_prefix(tokenizer)
+    if args.response_template:
+        response_template = args.response_template
+        if not _template_found_in_all(tokenizer, train_ds, response_template):
+            raise RuntimeError(
+                f"--response_template={response_template!r} not found in "
+                "training examples; would mask every label as -100."
+            )
+    else:
+        candidate = assistant_response_prefix(tokenizer)
+        response_template = resolve_response_template(tokenizer, train_ds, candidate)
     print(f"  SFT response_template (loss starts after this): {response_template!r}")
     collator = DataCollatorForCompletionOnlyLM(
         response_template=response_template,
         instruction_template=None,
         tokenizer=tokenizer,
     )
-
-    # Guardrail: if the response template can't be found in training examples,
-    # the collator silently masks every label as -100, producing zero gradients
-    # and an unchanged LoRA adapter (B stays at 0). Surface that now.
-    _sanity_check_response_template(tokenizer, train_ds, response_template)
 
     use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
     training_args = SFTConfig(
