@@ -1,0 +1,76 @@
+{
+  "model": "/home/taegyoem/scratch/qwen_7b",
+  "adapter": "checkpoints/qwen2.5-7b-double-prompt-multi/final",
+  "benchmarks": {
+    "arc": {
+      "display_name": "ARC-Challenge",
+      "n_test": 1172,
+      "vanilla_single": 0.90273,
+      "vanilla_double": 0.90529,
+      "finetuned_double": 0.913823,
+      "double_prompt_gain": 0.00256,
+      "finetuning_gain": 0.008533,
+      "total_gain": 0.011093
+    },
+    "openbookqa": {
+      "display_name": "OpenBookQA",
+      "n_test": 500,
+      "vanilla_single": 0.874,
+      "vanilla_double": 0.886,
+      "finetuned_double": 0.942,
+      "double_prompt_gain": 0.012,
+      "finetuning_gain": 0.056,
+      "total_gain": 0.068
+    },
+    "gsm8k": {
+      "display_name": "GSM8K",
+      "n_test": 1319,
+      "vanilla_single": 0.194845,
+      "vanilla_double": 0.244882,
+      "finetuned_double": 0.295679,
+      "double_prompt_gain": 0.050037,
+      "finetuning_gain": 0.050797,
+      "total_gain": 0.100834
+    },
+    "mmlu_pro": {
+      "display_name": "MMLU-Pro",
+      "n_test": 2000,
+      "vanilla_single": 0.4205,
+      "vanilla_double": 0.435,
+      "finetuned_double": 0.467,
+      "double_prompt_gain": 0.0145,
+      "finetuning_gain": 0.032,
+      "total_gain": 0.0465
+    },
+    "math": {
+      "display_name": "MATH",
+      "n_test": 1000,
+      "vanilla_single": 0.236,
+      "vanilla_double": 0.254,
+      "finetuned_double": 0.277,
+      "double_prompt_gain": 0.018,
+      "finetuning_gain": 0.023,
+      "total_gain": 0.041
+    },
+    "name_index": {
+      "display_name": "NameIndex",
+      "n_test": 300,
+      "vanilla_single": 0.026667,
+      "vanilla_double": 0.03,
+      "finetuned_double": 0.063333,
+      "double_prompt_gain": 0.003333,
+      "finetuning_gain": 0.033333,
+      "total_gain": 0.036666
+    },
+    "middle_match": {
+      "display_name": "MiddleMatch",
+      "n_test": 300,
+      "vanilla_single": 0.25,
+      "vanilla_double": 0.326667,
+      "finetuned_double": 0.253333,
+      "double_prompt_gain": 0.076667,
+      "finetuning_gain": -0.073334,
+      "total_gain": 0.003333
+    }
+  }
+}
