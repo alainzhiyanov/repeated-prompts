@@ -6,3 +6,4 @@ checkpoints/
 results.json
 logs/
 *.egg-info/
+paper_overleaf.zip
